@@ -1,0 +1,334 @@
+<<__Created by Deepu Yadav!!
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weather & Stopwatch</title>
+<style>
+/* ============ CSS ============ */
+:root{
+  --bg1:#1d4e89; --bg2:#5fa8d3;          /* sky gradient, changed by JS per weather */
+  --ink:#0f1b2d; --glass:rgba(255,255,255,.16); --glass-b:rgba(255,255,255,.28);
+  --text:#fff; --muted:rgba(255,255,255,.75); --accent:#ffd166; --danger:#ff6b6b; --ok:#6ee7a8;
+  --radius:22px;
+}
+*{box-sizing:border-box;margin:0}
+html,body{min-height:100%}
+body{
+  font-family:"Avenir Next","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+  color:var(--text);
+  background:linear-gradient(160deg,var(--bg1),var(--bg2)) fixed;
+  transition:background .8s;
+  display:flex;justify-content:center;padding:20px 14px 40px;
+}
+body[data-theme="clear"]{--bg1:#1d6fb8;--bg2:#79c2ee}
+body[data-theme="night"]{--bg1:#0b1530;--bg2:#2b3a67}
+body[data-theme="cloud"]{--bg1:#4a5a6e;--bg2:#9fb0c3}
+body[data-theme="rain"]{--bg1:#27374d;--bg2:#5a7691}
+body[data-theme="snow"]{--bg1:#6d86a3;--bg2:#d5e3f1}
+body[data-theme="storm"]{--bg1:#1c1b33;--bg2:#4b4a72}
+body[data-theme="stopwatch"]{--bg1:#101826;--bg2:#243b55}
+
+.app{width:100%;max-width:520px}
+.tabs{display:flex;gap:6px;padding:5px;background:var(--glass);border:1px solid var(--glass-b);
+  border-radius:999px;backdrop-filter:blur(12px);margin-bottom:18px}
+.tab{flex:1;border:0;background:none;color:var(--muted);font:inherit;font-weight:600;
+  padding:11px;border-radius:999px;cursor:pointer;transition:.2s}
+.tab[aria-selected="true"]{background:#fff;color:var(--ink)}
+.panel[hidden]{display:none}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+.card{background:var(--glass);border:1px solid var(--glass-b);border-radius:var(--radius);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:20px}
+
+/* ---- Weather ---- */
+.search{display:flex;gap:8px;margin-bottom:14px}
+.search input{flex:1;min-width:0;padding:14px 16px;border-radius:14px;border:1px solid var(--glass-b);
+  background:rgba(255,255,255,.92);color:var(--ink);font:inherit;font-size:1rem}
+.btn{border:0;font:inherit;font-weight:600;cursor:pointer;border-radius:14px;padding:0 16px;
+  background:var(--accent);color:var(--ink);transition:transform .1s,filter .2s}
+.btn:hover{filter:brightness(1.07)} .btn:active{transform:scale(.96)}
+.btn.ghost{background:var(--glass);color:var(--text);border:1px solid var(--glass-b)}
+.toolbar{display:flex;gap:8px;margin-bottom:14px}
+.toolbar .btn{padding:9px 14px;font-size:.9rem}
+.status{min-height:1.4em;color:var(--muted);font-size:.95rem;margin-bottom:10px}
+.status.err{color:#ffd0d0}
+
+.hero{text-align:center;padding:26px 16px}
+.city{font-size:1.3rem;font-weight:600}
+.date{color:var(--muted);font-size:.9rem;margin-top:2px}
+.icon{font-size:5rem;line-height:1.1;margin:10px 0 0}
+.temp{font-size:5.4rem;font-weight:200;line-height:1;letter-spacing:-.04em}
+.cond{font-size:1.2rem;margin-top:6px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+.stat{text-align:center;padding:14px 6px}
+.stat b{display:block;font-size:1.25rem}
+.stat span{color:var(--muted);font-size:.82rem}
+.forecast{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:14px;padding:14px 8px}
+.day{text-align:center;font-size:.85rem}
+.day i{display:block;font-style:normal;font-size:1.6rem;margin:4px 0}
+.day small{color:var(--muted)}
+.skeleton{opacity:.5}
+
+/* ---- Stopwatch ---- */
+.sw-face{text-align:center;padding:34px 12px}
+.sw-time{font-size:clamp(3rem,16vw,4.8rem);font-weight:200;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.sw-time small{font-size:.5em;color:var(--muted)}
+.sw-lap-now{color:var(--muted);margin-top:6px;font-variant-numeric:tabular-nums;min-height:1.4em}
+.sw-controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.sw-controls .btn{padding:16px;font-size:1.05rem}
+#startPause.running{background:var(--danger);color:#fff}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.laps{margin-top:14px;padding:6px 18px;max-height:340px;overflow:auto}
+.laps:empty::before{content:"Laps appear here. Press Lap while the stopwatch runs.";display:block;color:var(--muted);padding:14px 0;font-size:.92rem}
+.lap{display:grid;grid-template-columns:2.2em 1fr 1fr;padding:11px 0;border-bottom:1px solid var(--glass-b);
+  font-variant-numeric:tabular-nums}
+.lap:last-child{border:0}
+.lap span:nth-child(3){text-align:right;color:var(--muted)}
+.lap.best{color:var(--ok)} .lap.worst{color:var(--danger)}
+.hint{color:var(--muted);font-size:.8rem;text-align:center;margin-top:12px}
+@media(min-width:600px){body{padding-top:44px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body data-theme="clear">
+<main class="app">
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tab-weather" aria-selected="true" aria-controls="weather">Weather</button>
+    <button class="tab" role="tab" id="tab-stopwatch" aria-selected="false" aria-controls="stopwatch">Stopwatch</button>
+  </div>
+
+  <!-- ============ WEATHER ============ -->
+  <section class="panel" id="weather" role="tabpanel" aria-labelledby="tab-weather">
+    <form class="search" id="searchForm">
+      <input id="cityInput" type="search" placeholder="Search a city, e.g. Tokyo" aria-label="City name" autocomplete="off">
+      <button class="btn" type="submit">Search</button>
+    </form>
+    <div class="toolbar">
+      <button class="btn ghost" id="locateBtn" type="button">Use my location</button>
+      <button class="btn ghost" id="unitBtn" type="button" aria-label="Switch units">°C · km/h</button>
+    </div>
+    <div class="status" id="status" role="status">Search for a city to see the weather.</div>
+
+    <div id="result" hidden>
+      <div class="card hero">
+        <div class="city" id="city"></div>
+        <div class="date" id="date"></div>
+        <div class="icon" id="icon" aria-hidden="true"></div>
+        <div class="temp" id="temp"></div>
+        <div class="cond" id="cond"></div>
+      </div>
+      <div class="stats">
+        <div class="card stat"><b id="humidity"></b><span>Humidity</span></div>
+        <div class="card stat"><b id="wind"></b><span>Wind speed</span></div>
+        <div class="card stat"><b id="feels"></b><span>Feels like</span></div>
+      </div>
+      <div class="card forecast" id="forecast"></div>
+    </div>
+  </section>
+
+  <!-- ============ STOPWATCH ============ -->
+  <section class="panel" id="stopwatch" role="tabpanel" aria-labelledby="tab-stopwatch" hidden>
+    <div class="card sw-face">
+      <div class="sw-time" id="swTime" aria-live="off">00:00<small>.00</small></div>
+      <div class="sw-lap-now" id="swLapNow"></div>
+    </div>
+    <div class="sw-controls">
+      <button class="btn" id="startPause" type="button">Start</button>
+      <button class="btn ghost" id="lapBtn" type="button" disabled>Lap</button>
+    </div>
+    <div class="sw-controls" style="margin-top:10px">
+      <button class="btn ghost" id="resetBtn" type="button" style="grid-column:1/-1;padding:14px">Reset</button>
+    </div>
+    <div class="card laps" id="laps"></div>
+    <p class="hint">Keyboard: Space = start/pause · L = lap · R = reset</p>
+  </section>
+</main>
+
+<script>
+/* ============ JavaScript ============ */
+const $ = id => document.getElementById(id);
+
+/* ---------- Tabs ---------- */
+let activeTab = "weather";
+function showTab(name){
+  activeTab = name;
+  ["weather","stopwatch"].forEach(t=>{
+    $(t).hidden = t !== name;
+    $("tab-"+t).setAttribute("aria-selected", t === name);
+  });
+  document.body.dataset.theme = name === "stopwatch" ? "stopwatch" : (lastTheme || "clear");
+}
+$("tab-weather").onclick = () => showTab("weather");
+$("tab-stopwatch").onclick = () => showTab("stopwatch");
+
+/* ---------- Weather (Open-Meteo: free, no API key) ---------- */
+const GEO_URL = "https://geocoding-api.open-meteo.com/v1/search";
+const WX_URL  = "https://api.open-meteo.com/v1/forecast";
+
+// WMO weather codes -> label, emoji, background theme
+const CODES = {
+  0:["Clear sky","☀️","clear"],1:["Mainly clear","🌤️","clear"],2:["Partly cloudy","⛅","cloud"],3:["Overcast","☁️","cloud"],
+  45:["Fog","🌫️","cloud"],48:["Rime fog","🌫️","cloud"],
+  51:["Light drizzle","🌦️","rain"],53:["Drizzle","🌦️","rain"],55:["Heavy drizzle","🌧️","rain"],
+  56:["Freezing drizzle","🌧️","rain"],57:["Freezing drizzle","🌧️","rain"],
+  61:["Light rain","🌦️","rain"],63:["Rain","🌧️","rain"],65:["Heavy rain","🌧️","rain"],
+  66:["Freezing rain","🌧️","rain"],67:["Freezing rain","🌧️","rain"],
+  71:["Light snow","🌨️","snow"],73:["Snow","❄️","snow"],75:["Heavy snow","❄️","snow"],77:["Snow grains","❄️","snow"],
+  80:["Rain showers","🌦️","rain"],81:["Rain showers","🌧️","rain"],82:["Violent showers","🌧️","rain"],
+  85:["Snow showers","🌨️","snow"],86:["Snow showers","🌨️","snow"],
+  95:["Thunderstorm","⛈️","storm"],96:["Thunderstorm, hail","⛈️","storm"],99:["Thunderstorm, hail","⛈️","storm"]
+};
+const info = c => CODES[c] || ["Unknown","🌡️","clear"];
+
+let metric = true, lastTheme = "clear", lastPlace = null;
+
+function setStatus(msg, err){ const s=$("status"); s.textContent = msg; s.classList.toggle("err", !!err); }
+
+async function getJSON(url){
+  const r = await fetch(url);
+  if(!r.ok) throw new Error("Request failed ("+r.status+")");
+  return r.json();
+}
+
+async function searchCity(name){
+  setStatus("Searching…");
+  try{
+    const g = await getJSON(`${GEO_URL}?name=${encodeURIComponent(name)}&count=1&language=en&format=json`);
+    if(!g.results || !g.results.length) return setStatus(`No city found for "${name}". Check the spelling and try again.`, true);
+    const p = g.results[0];
+    loadWeather({lat:p.latitude, lon:p.longitude, name:[p.name,p.admin1,p.country].filter(Boolean).join(", ")});
+  }catch(e){ setStatus("Could not reach the weather service. Check your connection and try again.", true); }
+}
+
+async function loadWeather(place){
+  lastPlace = place;
+  setStatus("Loading weather…");
+  const params = new URLSearchParams({
+    latitude: place.lat, longitude: place.lon, timezone:"auto", forecast_days:5,
+    current:"temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,is_day",
+    daily:"weather_code,temperature_2m_max,temperature_2m_min",
+    temperature_unit: metric ? "celsius" : "fahrenheit",
+    wind_speed_unit: metric ? "kmh" : "mph"
+  });
+  try{
+    const d = await getJSON(`${WX_URL}?${params}`);
+    render(place, d);
+    try{ localStorage.setItem("lastPlace", JSON.stringify(place)); }catch(_){}
+    setStatus("");
+  }catch(e){ setStatus("Could not load weather data. Try again in a moment.", true); }
+}
+
+function render(place, d){
+  const c = d.current, tu = metric ? "°C" : "°F", wu = metric ? "km/h" : "mph";
+  const [label, emoji, theme] = info(c.weather_code);
+  $("city").textContent = place.name;
+  $("date").textContent = new Date(c.time).toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});
+  $("icon").textContent = (!c.is_day && theme==="clear") ? "🌙" : emoji;
+  $("temp").textContent = Math.round(c.temperature_2m) + "°";
+  $("cond").textContent = label;
+  $("humidity").textContent = c.relative_humidity_2m + "%";
+  $("wind").textContent = Math.round(c.wind_speed_10m) + " " + wu;
+  $("feels").textContent = Math.round(c.apparent_temperature) + tu;
+
+  $("forecast").innerHTML = d.daily.time.map((t,i)=>{
+    const day = i===0 ? "Today" : new Date(t+"T12:00").toLocaleDateString(undefined,{weekday:"short"});
+    return `<div class="day">${day}<i>${info(d.daily.weather_code[i])[1]}</i>
+      <b>${Math.round(d.daily.temperature_2m_max[i])}°</b> <small>${Math.round(d.daily.temperature_2m_min[i])}°</small></div>`;
+  }).join("");
+
+  lastTheme = (!c.is_day && theme==="clear") ? "night" : theme;
+  if(activeTab==="weather") document.body.dataset.theme = lastTheme;
+  $("result").hidden = false;
+}
+
+$("searchForm").addEventListener("submit", e=>{
+  e.preventDefault();
+  const v = $("cityInput").value.trim();
+  if(v) searchCity(v); else setStatus("Type a city name first.", true);
+});
+$("unitBtn").onclick = () => {
+  metric = !metric;
+  $("unitBtn").textContent = metric ? "°C · km/h" : "°F · mph";
+  if(lastPlace) loadWeather(lastPlace);
+};
+$("locateBtn").onclick = () => {
+  if(!navigator.geolocation) return setStatus("Your browser does not support location.", true);
+  setStatus("Finding your location…");
+  navigator.geolocation.getCurrentPosition(
+    p => loadWeather({lat:p.coords.latitude, lon:p.coords.longitude, name:"Your location"}),
+    () => setStatus("Location blocked. Allow access in your browser, or search for a city.", true),
+    {timeout:10000}
+  );
+};
+// restore last city, or start with a default
+(function init(){
+  let saved = null;
+  try{ saved = JSON.parse(localStorage.getItem("lastPlace")); }catch(_){}
+  if(saved) loadWeather(saved); else searchCity("London");
+})();
+
+/* ---------- Stopwatch ---------- */
+let swRunning = false, swStart = 0, swElapsed = 0, lapMark = 0, rafId = null, laps = [];
+
+function fmt(ms){
+  const cs = Math.floor(ms/10)%100, s = Math.floor(ms/1000)%60, m = Math.floor(ms/60000)%60, h = Math.floor(ms/3600000);
+  const p = n => String(n).padStart(2,"0");
+  return (h ? p(h)+":" : "") + p(m) + ":" + p(s) + "." + p(cs);
+}
+function now(){ return swElapsed + (swRunning ? performance.now() - swStart : 0); }
+
+function tick(){
+  const t = fmt(now()), i = t.lastIndexOf(".");
+  $("swTime").innerHTML = t.slice(0,i) + "<small>" + t.slice(i) + "</small>";
+  $("swLapNow").textContent = laps.length || swRunning ? "Current lap " + fmt(now() - lapMark) : "";
+  if(swRunning) rafId = requestAnimationFrame(tick);
+}
+function startPause(){
+  if(!swRunning){
+    swStart = performance.now(); swRunning = true;
+    $("startPause").textContent = "Pause"; $("startPause").classList.add("running");
+    $("lapBtn").disabled = false; tick();
+  }else{
+    swElapsed += performance.now() - swStart; swRunning = false;
+    cancelAnimationFrame(rafId);
+    $("startPause").textContent = "Resume"; $("startPause").classList.remove("running");
+    $("lapBtn").disabled = true; tick();
+  }
+}
+function lap(){
+  if(!swRunning) return;
+  const total = now();
+  laps.unshift({n: laps.length+1, split: total - lapMark, total});
+  lapMark = total;
+  renderLaps();
+}
+function reset(){
+  swRunning = false; cancelAnimationFrame(rafId);
+  swElapsed = 0; lapMark = 0; laps = [];
+  $("startPause").textContent = "Start"; $("startPause").classList.remove("running");
+  $("lapBtn").disabled = true;
+  renderLaps(); tick(); $("swLapNow").textContent = "";
+}
+function renderLaps(){
+  const splits = laps.map(l=>l.split), best = Math.min(...splits), worst = Math.max(...splits);
+  $("laps").innerHTML = laps.map(l=>{
+    const cls = laps.length > 2 ? (l.split===best ? "best" : l.split===worst ? "worst" : "") : "";
+    return `<div class="lap ${cls}"><span>${l.n}</span><span>${fmt(l.split)}</span><span>${fmt(l.total)}</span></div>`;
+  }).join("");
+}
+$("startPause").onclick = startPause;
+$("lapBtn").onclick = lap;
+$("resetBtn").onclick = reset;
+
+document.addEventListener("keydown", e=>{
+  if(activeTab!=="stopwatch" || /INPUT|TEXTAREA/.test(e.target.tagName)) return;
+  if(e.code==="Space"){ e.preventDefault(); startPause(); }
+  else if(e.key==="l"||e.key==="L") lap();
+  else if(e.key==="r"||e.key==="R") reset();
+});
+</script>
+</body>
+</html>
